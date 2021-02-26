@@ -1,0 +1,38 @@
+#!/bin/bash
+
+set -ue
+
+if [ -z "${INSTALL_DIR+set}" ]; then
+  INSTALL_DIR="${0%/*}"
+fi
+
+if [ -z "${TERRAFORM_VERSION+set}" ]; then
+  dir=$(pwd)
+  while [ ! -f "$dir/.terraform-version" ]; do
+    if [ "$dir" = "" ]; then
+      echo >&2 "Create .terraform-version file or set TERRAFORM_VERSION environment variable."
+      exit 1
+    fi
+    dir="${dir%/*}"
+  done
+  TERRAFORM_VERSION=$(cat "$dir/.terraform-version")
+fi
+
+TERRAFORM_BIN="${INSTALL_DIR?}/terraform_${TERRAFORM_VERSION?}"
+
+if [ ! -x "$TERRAFORM_BIN" ]; then
+  OS_PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
+  OS_MACHINE="amd64"
+  DOWNLOAD_URL="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${OS_PLATFORM}_${OS_MACHINE}.zip"
+  DOWNLOAD_DST="/tmp/terraform_${TERRAFORM_VERSION}_${OS_PLATFORM}_${OS_MACHINE}.zip"
+  if [ ! -f "$DOWNLOAD_DST" ]; then
+    curl -Lo "$DOWNLOAD_DST" "$DOWNLOAD_URL"
+  fi
+  if [ ! "$TERRAFORM_BIN" -nt "$DOWNLOAD_DST" ]; then
+    unzip -p "$DOWNLOAD_DST" terraform > "$TERRAFORM_BIN"
+  fi
+  chmod +x "$TERRAFORM_BIN"
+fi
+
+# pass it to real terraform:
+exec "$TERRAFORM_BIN" "$@"
